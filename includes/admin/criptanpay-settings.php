@@ -18,7 +18,7 @@ return apply_filters(
 			'title'       => __( 'Title', 'woocommerce-gateway-criptanpay' ),
 			'type'        => 'text',
 			'description' => __( 'This controls the title which the user sees during checkout.', 'woocommerce-gateway-criptanpay' ),
-			'default'     => __( 'Cryptocurrency payments', 'woocommerce-gateway-criptanpay' ),
+			'default'     => __( 'CriptanPay cryptocurrency payments', 'woocommerce-gateway-criptanpay' ),
 			'desc_tip'    => true,
 		),
 		'description'                   => array(
@@ -29,15 +29,29 @@ return apply_filters(
 			'desc_tip'    => true,
 		),
 		'webhook'                       => array(
-			'title'       => __( 'Webhook Endpoints', 'woocommerce-gateway-criptanpay' ),
+			'title'       => __( 'Webhook settings', 'woocommerce-gateway-criptanpay' ),
 			'type'        => 'title',
-			/* translators: webhook URL */
 			'description' => $this->display_admin_settings_webhook_description(),
+		),
+		'webhook_url'                         => array(
+			'title'       => __( 'Endpoint URL', 'woocommerce-gateway-criptanpay' ),
+			'type'        => 'text',
+			'description' => __( 'Copy the Webhook endpoint URL to your Criptanpay settings panel.', 'woocommerce-gateway-criptanpay' ),
+			'default'     => $this->display_admin_settings_webhook_url(),
+			'desc_tip'    => true,
+			'custom_attributes' => array( 'readonly' => 'readonly' ),
+		),
+		'webhook_secret_key'                         => array(
+			'title'       => __( 'Secret key', 'woocommerce-gateway-criptanpay' ),
+			'type'        => 'text',
+			'description' => __( 'Copy the secret key to your Criptanpay settings panel.', 'woocommerce-gateway-criptanpay' ),
+			'default'     => $this->display_admin_settings_webhook_secret_key(),
+			'desc_tip'    => true,
 		),
 		'api_credentials'               => array(
 			'title'       => __( 'Criptanpay Account Keys', 'woocommerce-gateway-criptanpay' ),
 			'type'        => 'title',
-			'description' => __( '', 'woocommerce-gateway-criptanpay'),
+			'description' => __( '', 'woocommerce-gateway-criptanpay' ),
 		),
 		'testmode'                      => array(
 			'title'       => __( 'Test mode', 'woocommerce-gateway-criptanpay' ),
@@ -55,7 +69,7 @@ return apply_filters(
 			'desc_tip'    => true,
 		),
 		'secret_key'                    => array(
-			'title'       => __( 'Live Secret Key', 'woocommerce-gateway-criptanpay' ),
+			'title'       => __( 'Live Secret API Key', 'woocommerce-gateway-criptanpay' ),
 			'type'        => 'password',
 			'description' => __( 'Get your API keys from your criptanpay account. Invalid values will be rejected. Only values starting with "sk_live_" or "rk_live_" will be saved.', 'woocommerce-gateway-criptanpay' ),
 			'default'     => '',
