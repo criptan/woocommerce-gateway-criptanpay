@@ -39,7 +39,7 @@ class WC_Criptanpay_Helper {
 	 * @return string
 	 */
 	public static function get_webhook_url() {
-		return add_query_arg( 'wc-api', 'wc_criptanpay', trailingslashit( get_home_url() ) );
+		return trailingslashit( get_home_url() ) . 'wp-api/wc_criptanpay/';
 	}
 
 		/**

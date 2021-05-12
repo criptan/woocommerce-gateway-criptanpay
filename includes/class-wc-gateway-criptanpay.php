@@ -100,9 +100,9 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 	public function set_api_url() {
 		if ( ! isset( $this->api_url ) ) {
 			if ( 'yes' === $this->get_option( 'testmode' ) ) {
-				$this->api_url = 'https://p2d9p00zue.execute-api.eu-central-1.amazonaws.com/v1/business/';
+				$this->api_url = 'https://api.staging.cashbilly.com/business/';
 			} else {
-				$this->api_url = 'https://p2d9p00zue.execute-api.eu-central-1.amazonaws.com/v1/business/';
+				$this->api_url = 'https://api.criptan.com/business/';
 			}
 		}
 	}
@@ -115,6 +115,10 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 
 	public function get_api_url() {
 		return $this->api_url;
+	}
+
+	public function get_id() {
+		return $this->id;
 	}
 
 	/**
@@ -185,8 +189,19 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 		$charged_captured = property_exists( $response, 'id' ) ? true : false;
 
 		if ( $charged_captured ) {
-			$status = strtolower( $response->paymentStatus );
-			
+
+			// get status of charge create responses
+			$status = ( property_exists( $response, 'paymentStatus' ) ? $response->paymentStatus : false );
+			// get status of charge info responses
+			$status = ( property_exists( $response, 'status') ? $response->status : false );
+
+			if ( ! $status ) {
+				$localized_message = __( 'An error occurred while trying to process the response through the Criptanpay payment gateway. Review settings or contact Criptanpay support', 'woocommerce-gateway-criptanpay' );
+				throw new WC_Criptanpay_Exception( print_r( $response, true ), $localized_message );
+			}
+
+			$status = strtolower( $status );
+
 			/**
 			 * Charge can be captured but in a pending state. Payment methods
 			 * that are asynchronous may take couple days to clear. Webhook will
@@ -332,8 +347,8 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 		$post_data             = array();
 		$post_data['currency'] = $order->get_currency();
 		$post_data['amount']   = absint( $order->get_total() );
-		$post_data['cancelUrl'] 	= $this->get_return_url( $order ); // http://f769225349c3.ngrok.io/
-		$post_data['continueUrl'] = $this->get_return_url( $order ); // http://f769225349c3.ngrok.io/
+		$post_data['cancelUrl'] 	= $this->get_return_url( $order );
+		$post_data['continueUrl'] = $this->get_return_url( $order );
 		$post_data['ttl'] = 5;
 		$post_data['description'] = sprintf( __( '%1$s - Order %2$s', 'woocommerce-gateway-criptanpay' ), wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ), $order->get_order_number() );
 		
@@ -365,11 +380,11 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 		$post_data['products'] = apply_filters( 'wc_criptanpay_payment_products', $products, $order );
 
 		$metadata = array(
-			'order_id' => $order->get_order_number(),
+			'order_id' => $order->get_id(),
 			'site_url' => esc_url( get_site_url() )
 		);
 
-		// $post_data['metadata'] = apply_filters( 'wc_criptanpay_payment_metadata', $metadata, $order );
+		$post_data['metadata'] = apply_filters( 'wc_criptanpay_payment_metadata', $metadata, $order );
 
 		/**
 		 * Filter the return value of the WC_Payment_Gateway_CC::generate_payment_request.

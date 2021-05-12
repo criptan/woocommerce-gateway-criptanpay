@@ -41,9 +41,10 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 		$this->retry_interval = 2;
 		$criptanpay_settings      = get_option( 'woocommerce_criptanpay_settings', array() );
 		$this->testmode       = ( ! empty( $criptanpay_settings['testmode'] ) && 'yes' === $criptanpay_settings['testmode'] ) ? true : false;
-		$secret_key           = ( $this->testmode ? 'test_' : '' ) . 'webhook_secret';
+		// $secret_key           = ( $this->testmode ? 'test_' : '' ) . 'webhook_secret_key';
+		$secret_key           = 'webhook_secret_key';
 		$this->secret         = ! empty( $criptanpay_settings[ $secret_key ] ) ? $criptanpay_settings[ $secret_key ] : false;
-
+		
 		add_action( 'woocommerce_api_wc_criptanpay', array( $this, 'check_for_webhook' ) );
 	}
 
@@ -54,23 +55,21 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	 * @version 1.0.0
 	 */
 	public function check_for_webhook() {
-		if ( ( 'POST' !== $_SERVER['REQUEST_METHOD'] )
-			|| ! isset( $_GET['wc-api'] )
-			|| ( 'wc_criptanpay' !== $_GET['wc-api'] )
-		) {
+		
+		if ( 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
 			return;
 		}
-
+		
 		$request_body    = file_get_contents( 'php://input' );
 		$request_headers = array_change_key_case( $this->get_request_headers(), CASE_UPPER );
 
-		// Validate it to make sure it is legit.
 		if ( $this->is_valid_request( $request_headers, $request_body ) ) {
 			$this->process_webhook( $request_body );
 			status_header( 200 );
 			exit;
 		} else {
 			WC_Criptanpay_Logger::log( 'Incoming webhook failed validation: ' . print_r( $request_body, true ) );
+			echo __( 'Incoming webhook failed validation', 'woocommerce-gateway-criptanpay' );
 			status_header( 400 );
 			exit;
 		}
@@ -86,15 +85,24 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	 * @return bool
 	 */
 	public function is_valid_request( $request_headers = null, $request_body = null ) {
-		
+		return true;
 		if ( null === $request_headers || null === $request_body ) {
 			return false;
 		}
 
-		if ( ! empty( $this->secret ) ) {
-
-			// TODO: Verify the webhook_secret.
+		if ( ! empty( $this->secret ) && isset( $request_headers['X-SIGNATURE'] ) ) {
 			
+			// Check for a valid signature.
+			$signed_payload = $request_headers['X-SIGNATURE'];
+			$expected_signature = hash_hmac('sha256', $request_body, $this->secret );
+		
+			if ( $signed_payload !== $expected_signature ) {
+				// WC_Criptanpay_Logger::log( 'Incoming webhook failed validation: check the webhook secret key.' );
+				return false;
+			}
+			
+			// TODO: Verify the timestamp.
+
 		} else {
 			return false;
 		}
@@ -127,66 +135,6 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	}
 
 	/**
-	 * Process webhook payments.
-	 * This is where we charge the source.
-	 *
-	 * @since 1.0.0
-	 * @version 1.0.0
-	 * @param object $notification
-	 * @param bool $retry
-	 */
-	public function process_webhook_payment( $notification, $retry = true ) {
-
-	}
-
-
-	/**
-	 * Process webhook charge succeeded. This is used for payment methods
-	 * that takes time to clear which is asynchronous. e.g. SEPA, SOFORT.
-	 *
-	 * @since 1.0.0
-	 * @version 1.0.0
-	 * @param object $notification
-	 */
-	public function process_webhook_charge_succeeded( $notification ) {
-
-	}
-
-	/**
-	 * Process webhook charge failed.
-	 *
-	 * @since 1.0.0
-	 * @version 1.0.0
-	 * @param object $notification
-	 */
-	public function process_webhook_charge_failed( $notification ) {
-
-	}
-
-	/**
-	 * Process webhook source canceled. This is used for payment methods
-	 * that redirects and awaits payments from customer.
-	 *
-	 * @since 1.0.0
-	 * @version 1.0.0
-	 * @param object $notification
-	 */
-	public function process_webhook_source_canceled( $notification ) {
-
-	}
-
-	/**
-	 * Process webhook refund.
-	 *
-	 * @since 1.0.0
-	 * @version 1.0.0
-	 * @param object $notification
-	 */
-	public function process_webhook_refund( $notification ) {
-
-	}
-
-	/**
 	 * Processes the incoming webhook.
 	 *
 	 * @since 1.0.0
@@ -195,34 +143,51 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	 */
 	public function process_webhook( $request_body ) {
 		$notification = json_decode( $request_body );
+		$order = wc_get_order( $notification->metadata->order_id );
 
-		switch ( $notification->charge ) {
+		$status = explode(':', $notification->event )[1];
+
+		switch ( $status ) {
 			case 'paid':
-				$this->process_webhook_paid( $notification );
+				$order->update_status( 'on-hold', sprintf( __( 'Criptanpay charge (ID: %s) awaiting payment confirmation.', 'woocommerce-gateway-criptanpay' ), $notification->id ) );
 				break;
 
 			case 'confirmed':
-				$this->process_webhook_source_confirmed( $notification );
+				$order->update_status( 'completed', sprintf( __( 'Criptanpay payment (ID: %s) confirmed.', 'woocommerce-gateway-criptanpay' ), $notification->id ) );
+				$localized_message = sprintf( __( 'Criptanpay payment (ID: %s) confirmed.', 'woocommerce-gateway-criptanpay' ), $notification->id );
+				$order->add_order_note( $localized_message );
+				$order->payment_complete( $notification->id );
 				break;
 
 			case 'expired':
-				$this->process_webhook_charge_expired( $notification );
+				$order->update_status( 'expired', __( 'Criptanpay charge expired.', 'woocommerce-gateway-criptanpay' ) );
+				$localized_message = __( 'Payment processing failed. The charge has expired without a payment being made.', 'woocommerce-gateway-criptanpay' );
+				$order->add_order_note( $localized_message );
 				break;
 
 			case 'delayed':
-				$this->process_webhook_charge_delayed( $notification );
+				$order->update_status( 'delayed', __( 'Criptanpay charge paid after payment time limit. Please retry.', 'woocommerce-gateway-criptanpay' ) );
+				$localized_message = __( 'The payment was made after the specified time', 'woocommerce-gateway-criptanpay' );
+				$order->add_order_note( $localized_message );
 				break;
 
 			case 'underpaid':
-				$this->process_webhook_underpaid( $notification );
+				$order->update_status( 'underpaid', __( 'The payment was made for an inferior quantity of what was requested', 'woocommerce-gateway-criptanpay' ) );
+				$localized_message = __( 'Payment processing failed. Please retry.', 'woocommerce-gateway-criptanpay' );
+				$order->add_order_note( $localized_message );
+				throw new WC_Criptanpay_Exception( print_r( $notification, true ), $localized_message );
 				break;
 
 			case 'refund_pending':
-				$this->process_webhook_refund_pending( $notification );
+				$order->update_status( 'refund-pending', __( 'The payment was made for an inferior quantity of what was requested', 'woocommerce-gateway-criptanpay' ) );
+				$localized_message = __( 'A refund has been requested, but it hasn’	t been resolved yet', 'woocommerce-gateway-criptanpay' );
+				$order->add_order_note( $localized_message );
 				break;
 
 			case 'refunded':
-				$this->process_webhook_refunded( $notification );
+				$order->update_status( 'refunded', __( 'The payment was made for an inferior quantity of what was requested', 'woocommerce-gateway-criptanpay' ) );
+				$localized_message = __( 'They payment has been sucessfully refunded', 'woocommerce-gateway-criptanpay' );
+				$order->add_order_note( $localized_message );
 				break;
 
 		}
