@@ -85,7 +85,7 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	 * @return bool
 	 */
 	public function is_valid_request( $request_headers = null, $request_body = null ) {
-		return true;
+
 		if ( null === $request_headers || null === $request_body ) {
 			return false;
 		}
@@ -95,14 +95,12 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 			// Check for a valid signature.
 			$signed_payload = $request_headers['X-SIGNATURE'];
 			$expected_signature = hash_hmac('sha256', $request_body, $this->secret );
-		
+
 			if ( $signed_payload !== $expected_signature ) {
 				// WC_Criptanpay_Logger::log( 'Incoming webhook failed validation: check the webhook secret key.' );
 				return false;
 			}
 			
-			// TODO: Verify the timestamp.
-
 		} else {
 			return false;
 		}
@@ -143,7 +141,29 @@ class WC_Criptanpay_Webhook_Handler extends WC_Gateway_Criptanpay {
 	 */
 	public function process_webhook( $request_body ) {
 		$notification = json_decode( $request_body );
-		$order = wc_get_order( $notification->metadata->order_id );
+
+		if ( property_exists( $notification, 'metadata' ) ) {
+			$order = wc_get_order( $notification->metadata->order_id );
+		}
+
+		if ( ! property_exists( $notification, 'metadata' ) ) {
+			
+			$orders = wc_get_orders( array(
+				'limit' => 1,
+				'meta_key' => '_transaction_id',
+				'meta_value' => $notification->id
+			));
+
+
+			
+			if ( 1 === count( $orders ) ) {
+				foreach ( $orders as $order ) {
+					$order = $order;
+				}	
+			}
+			
+		}
+		
 
 		$status = explode(':', $notification->event )[1];
 

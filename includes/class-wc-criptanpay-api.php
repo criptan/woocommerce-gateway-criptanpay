@@ -111,7 +111,6 @@ class WC_Criptanpay_API {
 		$headers         = self::get_headers();
 		$request = apply_filters( 'woocommerce_criptanpay_request_body', $request, $endpoint );
 		$jsonRequestBody = json_encode( $request );
-		
 		$response = wp_safe_remote_post(
 			$api_url . $endpoint,
 			array(
@@ -119,9 +118,9 @@ class WC_Criptanpay_API {
 				'headers' => $headers,
 				'body'    => $jsonRequestBody,
 				'timeout' => 70,
-			)
-		);
-
+				)
+			);
+			
 		if ( is_wp_error( $response ) || empty( $response['body'] ) || isset( $response->errors ) ) {
 
 			WC_Criptanpay_Logger::log(

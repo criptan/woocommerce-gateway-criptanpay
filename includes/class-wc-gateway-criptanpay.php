@@ -100,7 +100,7 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 	public function set_api_url() {
 		if ( ! isset( $this->api_url ) ) {
 			if ( 'yes' === $this->get_option( 'testmode' ) ) {
-				$this->api_url = 'https://api.staging.cashbilly.com/business/';
+				$this->api_url = 'https://73cfddej33.execute-api.eu-west-2.amazonaws.com/v1/business/';
 			} else {
 				$this->api_url = 'https://api.criptan.com/business/';
 			}
@@ -162,7 +162,6 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 			// Return receipt_page redirect
 			return array(
 				'result'   => 'success',
-				//'redirect' => $this->get_return_url( $order ),
 				'redirect'	=> $order->get_checkout_payment_url( true )
 			);
 
@@ -187,14 +186,16 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 		
 		$order_id = $order->get_id();
 		$charged_captured = property_exists( $response, 'id' ) ? true : false;
-
+		
 		if ( $charged_captured ) {
 
 			// get status of charge create responses
 			$status = ( property_exists( $response, 'paymentStatus' ) ? $response->paymentStatus : false );
 			// get status of charge info responses
-			$status = ( property_exists( $response, 'status') ? $response->status : false );
-
+			if ( empty( $status ) && property_exists( $response, 'status') ) {
+				$status =  $response->status;
+			}
+			
 			if ( ! $status ) {
 				$localized_message = __( 'An error occurred while trying to process the response through the Criptanpay payment gateway. Review settings or contact Criptanpay support', 'woocommerce-gateway-criptanpay' );
 				throw new WC_Criptanpay_Exception( print_r( $response, true ), $localized_message );
@@ -207,7 +208,6 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 			 * that are asynchronous may take couple days to clear. Webhook will
 			 * take care of the status changes.
 			 */
-
 			// Default
 			if ( 'pending' === $status) {
 				$order_stock_reduced = $order->get_meta( '_order_stock_reduced', true );
@@ -217,7 +217,7 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 				}
 
 				$order->set_transaction_id( $response->id  );
-				$order->update_meta_data( '_criptanpay_checkout',  $response->checkout );
+				$order->update_meta_data( '_criptanpay_checkout',  $response->checkoutUrl );
 
 			}
 			
@@ -384,7 +384,7 @@ class WC_Gateway_Criptanpay extends WC_Payment_Gateway {
 			'site_url' => esc_url( get_site_url() )
 		);
 
-		$post_data['metadata'] = apply_filters( 'wc_criptanpay_payment_metadata', $metadata, $order );
+		// $post_data['metadata'] = apply_filters( 'wc_criptanpay_payment_metadata', $metadata, $order );
 
 		/**
 		 * Filter the return value of the WC_Payment_Gateway_CC::generate_payment_request.
